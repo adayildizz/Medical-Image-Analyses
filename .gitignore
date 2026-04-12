@@ -1,0 +1,28 @@
+# Virtual environments
+venv/
+venv*/
+.venv/
+env/
+**/venv/
+**/.venv/
+
+# Data files (large)
+*.npz
+*.npy
+dermamnist_128/
+data/
+results/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
