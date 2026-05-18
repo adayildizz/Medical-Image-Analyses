@@ -39,7 +39,10 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from PIL import Image
 import numpy as np
-from scipy import ndimage
+try:
+    from scipy import ndimage
+except ImportError:
+    ndimage = None  # distance-map experiment requires scipy; see compute_distance_map()
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -196,6 +199,8 @@ class MTUNet(nn.Module):
 # ══════════════════════════════════════════════════════════════════
 
 def compute_distance_map(binary_mask_numpy):
+    if ndimage is None:
+        raise ImportError("scipy is required for distance-map regression. Install it with: pip install scipy")
     """
     Given a binary mask (0/1 numpy array, shape H×W),
     returns the Euclidean distance transform.
@@ -253,7 +258,7 @@ class LiverDataset(Dataset):
 
         # ── Load image ──
         img = Image.open(os.path.join(self.image_dir, fname)).convert("L")
-        img = img.resize(self.img_size)
+        img = img.resize(self.img_size, Image.BILINEAR)
         img = np.array(img, dtype=np.float32) / 255.0  # normalize to [0,1]
 
         # ── Z-normalization ──
@@ -266,9 +271,9 @@ class LiverDataset(Dataset):
         # ── Load label (binary mask) ──
         label_fname = fname.replace("_0000", "")  # labels don't have _0000 suffix
         lbl = Image.open(os.path.join(self.label_dir, label_fname)).convert("L")
-        lbl = lbl.resize(self.img_size)
-        lbl = np.array(lbl, dtype=np.float32) / 255.0
-        lbl = (lbl > 0.5).astype(np.float32)  # binarize
+        lbl = lbl.resize(self.img_size, Image.NEAREST)
+        lbl = np.array(lbl, dtype=np.float32)
+        lbl = (lbl > 0).astype(np.float32)  # binarize: labels are 0/1 or 0/255
 
         # ── Regression target ──
         if self.reg_target == 'image':
@@ -703,7 +708,7 @@ def train_with_custom_loss(model, train_loader, val_loader, num_epochs=50,
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
         if (epoch + 1) % 10 == 0:
             print(f"  Epoch {epoch+1:3d} | Train: {train_loss/len(train_loader):.4f}"
-                  f" | Val Dice: {val_loss:.4f}")
+                  f" | Val DiceLoss: {val_loss:.4f}")
 
     model.load_state_dict(best_state)
     return model
@@ -768,7 +773,7 @@ def train_custom_loss_clean(model_logits, train_loader, val_loader, num_epochs=5
             best_state = {k: v.clone() for k, v in model_logits.state_dict().items()}
         if (epoch + 1) % 10 == 0:
             print(f"  Epoch {epoch+1:3d} | Train: {train_loss/len(train_loader):.4f}"
-                  f" | Val Dice: {val_loss:.4f}")
+                  f" | Val DiceLoss: {val_loss:.4f}")
 
     model_logits.load_state_dict(best_state)
     return model_logits
@@ -779,7 +784,13 @@ def train_custom_loss_clean(model_logits, train_loader, val_loader, num_epochs=5
 # ══════════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+
     print(f"Using device: {device}")
 
     # ── Paths (update to your structure) ──
@@ -788,8 +799,12 @@ if __name__ == "__main__":
     TEST_IMGS   = "data/imagesTs"
     TEST_LBLS   = "data/labelsTs"
     IMG_SIZE    = (256, 256)
-    BATCH_SIZE  = 8
-    EPOCHS      = 50
+    # Quick run settings for tomorrow's assessment preparation.
+    # For a full experiment, increase EPOCHS and use ALPHAS_FULL below.
+    BATCH_SIZE  = 4
+    EPOCHS      = 5
+    ALPHAS      = [10, 1, 0.1]
+    ALPHAS_FULL = [100, 10, 1, 0.1, 0.01]
 
     # ── Get train/val filenames ──
     train_files, val_files = split_train_val(TRAIN_IMGS, val_volumes=range(81, 91))
@@ -830,7 +845,7 @@ if __name__ == "__main__":
         print("\n--- MT-UNet (image regression), alpha sweep ---")
         train_l, val_l, test_l = make_loaders('image', z_norm)
         best_alpha_img, best_f_img = None, -1
-        for alpha in [100, 10, 1, 0.1, 0.01]:
+        for alpha in ALPHAS:
             print(f"  alpha={alpha}")
             model_mt = MTUNet(in_channels=1, init_features=16)
             model_mt = train_mt(model_mt, train_l, val_l, alpha=alpha,
@@ -845,7 +860,7 @@ if __name__ == "__main__":
         print("\n--- MT-UNet (distance map), alpha sweep ---")
         train_l, val_l, test_l = make_loaders('distance', z_norm)
         best_alpha_dist, best_f_dist = None, -1
-        for alpha in [100, 10, 1, 0.1, 0.01]:
+        for alpha in ALPHAS:
             print(f"  alpha={alpha}")
             model_mt = MTUNet(in_channels=1, init_features=16)
             model_mt = train_mt(model_mt, train_l, val_l, alpha=alpha,

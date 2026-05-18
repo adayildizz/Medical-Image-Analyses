@@ -1,0 +1,58 @@
+Using device: mps
+Train: 320 images | Val: 70 images
+
+============================================================
+  WITH z-norm
+============================================================
+
+--- Baseline UNet ---
+  Precision: 0.4175 | Recall: 0.8514 | Dice/F: 0.4939
+
+--- MT-UNet (image regression), alpha sweep ---
+  alpha=10
+  Precision: 0.5446 | Recall: 0.7681 | Dice/F: 0.5601
+  alpha=1
+  Precision: 0.5123 | Recall: 0.7727 | Dice/F: 0.5413
+  alpha=0.1
+  Precision: 0.4889 | Recall: 0.8176 | Dice/F: 0.5434
+  Best alpha for MT-UNet(image): 10
+
+--- MT-UNet (distance map), alpha sweep ---
+  alpha=10
+  Precision: 0.5611 | Recall: 0.7219 | Dice/F: 0.5476
+  alpha=1
+  Precision: 0.5000 | Recall: 0.8558 | Dice/F: 0.5622
+  alpha=0.1
+  Precision: 0.5217 | Recall: 0.8112 | Dice/F: 0.5548
+  Best alpha for MT-UNet(distance): 1
+
+--- UNet with Custom FPFNWeightedLoss ---
+  Precision: 0.5418 | Recall: 0.7638 | Dice/F: 0.5697
+
+============================================================
+  WITHOUT z-norm
+============================================================
+
+--- Baseline UNet ---
+  Precision: 0.5447 | Recall: 0.7129 | Dice/F: 0.5393
+
+--- MT-UNet (image regression), alpha sweep ---
+  alpha=10
+  Precision: 0.5321 | Recall: 0.6924 | Dice/F: 0.5193
+  alpha=1
+  Precision: 0.4652 | Recall: 0.7637 | Dice/F: 0.5161
+  alpha=0.1
+  Precision: 0.5671 | Recall: 0.6440 | Dice/F: 0.5287
+  Best alpha for MT-UNet(image): 0.1
+
+--- MT-UNet (distance map), alpha sweep ---
+  alpha=10
+  Precision: 0.4740 | Recall: 0.7765 | Dice/F: 0.5165
+  alpha=1
+  Precision: 0.4639 | Recall: 0.8255 | Dice/F: 0.5304
+  alpha=0.1
+  Precision: 0.4020 | Recall: 0.9107 | Dice/F: 0.5044
+  Best alpha for MT-UNet(distance): 1
+
+--- UNet with Custom FPFNWeightedLoss ---
+  Precision: 0.4745 | Recall: 0.8242 | Dice/F: 0.5302
